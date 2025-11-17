@@ -1,0 +1,15 @@
+Flask==2.3.2
+requests==2.31.0
+qrcode==7.4.2
+Pillow==10.0.0
+gunicorn==21.2.0
+
+
+# ----------------------------------------------------------
+# 🔧 FILL THESE WITH YOUR REAL MTN MOMO CREDENTIALS
+# ----------------------------------------------------------
+#subscriptionKey = "4bfc7b16eda84b099329dd273c82a304";
+#apiUser = "d83b5778-06aa-44d1-941d-251b248cade8"           # X-Reference-Id used when API user was created
+#apiKey = "d4078f2c56594c6cb77377a0a4ec4abc"             # API Key returned when generating API key
+ 
+
