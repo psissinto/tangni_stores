@@ -5,7 +5,7 @@ import time
 app = Flask(__name__)
 
 # -----------------------------------------------------------
-# Mobile UI Page – Phone + Name
+# Mobile UI Page – Enter Phone + Name
 # -----------------------------------------------------------
 HOME_PAGE = """
 <!DOCTYPE html>
@@ -48,6 +48,7 @@ HOME_PAGE = """
         border: none;
         font-size: 18px;
     }
+
     button {
         background: #FFCC00;
         color: black;
@@ -114,14 +115,16 @@ LOADING_PAGE = """
         100% { transform: rotate(360deg); }
     }
 
-    p { font-size: 22px; margin-top: 0; }
+    p {
+        font-size: 22px;
+        margin-top: 0;
+    }
 </style>
 
 <script>
     setTimeout(function(){
-        window.location.href =
-          "/process?phone={{phone}}&payer={{payer}}";
-    }, 2500);
+        window.location.href = "/process?phone={{phone}}&payer={{payer}}";
+    }, 2500);  // show animation 2.5 seconds
 </script>
 
 </head>
@@ -136,75 +139,7 @@ LOADING_PAGE = """
 
 
 # -----------------------------------------------------------
-# Status Checking Screen (new)
-# -----------------------------------------------------------
-STATUS_PAGE = """
-<!DOCTYPE html>
-<html>
-<head>
-<title>Checking Payment Status…</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-    body {
-        margin: 0; padding: 0;
-        background-color: #111;
-        color: white;
-        font-family: Arial;
-        height: 100vh;
-        display: flex; justify-content: center; align-items: center;
-        flex-direction: column; text-align: center;
-    }
-
-    .circle {
-        border: 10px solid #444;
-        border-top: 10px solid #FFCC00;
-        border-radius: 50%;
-        width: 90px; height: 90px;
-        animation: spin 0.9s linear infinite;
-        margin-bottom: 20px;
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    p { font-size: 22px; }
-
-</style>
-
-<script>
-function checkStatus() {
-    fetch("/status?ref={{ref}}")
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === "SUCCESSFUL") {
-            window.location.href = "/success";
-        } else if (data.status === "FAILED" || data.status === "REJECTED") {
-            window.location.href = "/failed";
-        } else {
-            setTimeout(checkStatus, 2500);
-        }
-    });
-}
-
-setTimeout(checkStatus, 2000);
-</script>
-
-</head>
-<body>
-
-<div class="circle"></div>
-<p>Waiting for your confirmation…</p>
-
-</body>
-</html>
-"""
-
-
-# -----------------------------------------------------------
-# Success Screen (updated)
+# Payment Sent Confirmation Page
 # -----------------------------------------------------------
 SUCCESS_PAGE = """
 <!DOCTYPE html>
@@ -215,23 +150,25 @@ SUCCESS_PAGE = """
 
 <style>
     body {
-        margin: 0; padding: 0; background-color: #0A9310;
-        color: white; height: 100vh; display: flex;
-        justify-content: center; align-items: center;
-        font-family: Arial; text-align: center;
+        margin: 0;
+        padding: 0;
+        background-color: #0A9310;
+        color: white;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: Arial;
+        text-align: center;
     }
 
     .check {
-        font-size: 90px;
-        animation: pop 0.5s ease;
+        font-size: 80px;
     }
 
-    @keyframes pop {
-        0% { transform: scale(0.5); opacity: 0; }
-        100% { transform: scale(1.1); opacity: 1; }
+    h1 {
+        font-size: 28px;
     }
-
-    h1 { font-size: 32px; }
 </style>
 
 </head>
@@ -239,53 +176,8 @@ SUCCESS_PAGE = """
 
 <div>
     <div class="check">✔</div>
-    <h1>Payment Confirmed!</h1>
-    <p>Thank you. Enjoy your laundry service.</p>
-</div>
-
-</body>
-</html>
-"""
-
-
-# -----------------------------------------------------------
-# Failed Payment Screen
-# -----------------------------------------------------------
-FAILED_PAGE = """
-<!DOCTYPE html>
-<html>
-<head>
-<title>Payment Failed</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-    body {
-        margin: 0; padding: 0; background-color: #8B0000;
-        color: white; height: 100vh; display: flex;
-        justify-content: center; align-items: center;
-        font-family: Arial; text-align: center;
-    }
-
-    .fail {
-        font-size: 90px;
-        animation: pop 0.5s ease;
-    }
-
-    @keyframes pop {
-        0% { transform: scale(0.5); opacity: 0; }
-        100% { transform: scale(1.1); opacity: 1; }
-    }
-
-    h1 { font-size: 32px; }
-</style>
-
-</head>
-<body>
-
-<div>
-    <div class="fail">✘</div>
-    <h1>Payment Failed</h1>
-    <p>Please try again or contact support.</p>
+    <h1>Payment Request Sent!</h1>
+    <p>Please approve the payment on your phone.</p>
 </div>
 
 </body>
@@ -311,37 +203,21 @@ def loading():
 
 @app.route("/process")
 def process_payment():
-    amount = "530"
+
+    amount = "540"
     phone = request.args.get("phone")
     payer = request.args.get("payer")
     message = "Laundry Payment"
 
-    result = PayClass.momopay(amount, "XOF", message, phone, payer)
+    # Trigger MoMo payment
+    PayClass.momopay(amount, "XOF", message, phone, payer)
 
-    reference = result["reference"]
-
-    return render_template_string(STATUS_PAGE, ref=reference)
-
-
-@app.route("/status")
-def check_status():
-    ref = request.args.get("ref")
-    status = PayClass.check_status(ref)
-    return jsonify({"status": status})
-
-
-@app.route("/success")
-def success_screen():
+    # After processing → show success screen
     return render_template_string(SUCCESS_PAGE)
 
 
-@app.route("/failed")
-def failed_screen():
-    return render_template_string(FAILED_PAGE)
-
-
 # -----------------------------------------------------------
-# RUN SERVER
+# Run Server
 # -----------------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

@@ -6,30 +6,28 @@ import uuid
 
 class PayClass:
     # ----------------------------------------------------------
-    # 🔧 YOUR MTN MOMO CREDENTIALS
+    # 🔧 FILL THESE WITH YOUR REAL MTN MOMO CREDENTIALS
     # ----------------------------------------------------------
     subscriptionKey = "4bfc7b16eda84b099329dd273c82a304"
-    apiUser = "d83b5778-06aa-44d1-941d-251b248cade8"
-    apiKey = "d4078f2c56594c6cb77377a0a4ec4abc"
-
-    BASE_URL = "https://proxy.momoapi.mtn.com"
+    apiUser = "d83b5778-06aa-44d1-941d-251b248cade8"           # X-Reference-Id used when API user was created
+    apiKey = "d4078f2c56594c6cb77377a0a4ec4abc"             # API Key returned when generating API key
 
     # ----------------------------------------------------------
-    # Generate Basic Auth token
+    # Generate Basic Auth token (Base64 encoding)
     # ----------------------------------------------------------
     @staticmethod
     def get_basic_auth():
-        combo = f"{PayClass.apiUser}:{PayClass.apiKey}"
-        encoded = base64.b64encode(combo.encode()).decode()
+        text = f"{PayClass.apiUser}:{PayClass.apiKey}"
+        encoded = base64.b64encode(text.encode()).decode()
         return f"Basic {encoded}"
 
     # ----------------------------------------------------------
-    # Obtain Access Token
+    # Obtain access token from MoMo API
     # ----------------------------------------------------------
     @staticmethod
     def momotoken():
         try:
-            url = f"{PayClass.BASE_URL}/collection/token/"
+            url = "https://proxy.momoapi.mtn.com/collection/token/"
 
             headers = {
                 "Ocp-Apim-Subscription-Key": PayClass.subscriptionKey,
@@ -37,6 +35,7 @@ class PayClass:
             }
 
             response = requests.post(url, headers=headers)
+
             print("TOKEN RAW RESPONSE:", response.text)
 
             if response.status_code != 200:
@@ -50,21 +49,22 @@ class PayClass:
             return None
 
     # ----------------------------------------------------------
-    # RequestToPay — returns reference for tracking
+    # Trigger a request to pay (Collections API)
     # ----------------------------------------------------------
     @staticmethod
     def momopay(amount, currency, message, phone, payerName):
-
+        # 1. Get Access Token
         token_data = PayClass.momotoken()
+
         if token_data is None:
             return {"status": "failed", "reason": "Token generation failed"}
 
         access_token = token_data["access_token"]
 
-        # Payment endpoint
-        url = f"{PayClass.BASE_URL}/collection/v1_0/requesttopay"
+        # 2. Prepare RequestToPay URL
+        url = "https://proxy.momoapi.mtn.com/collection/v1_0/requesttopay"
 
-        # Unique reference ID (also used for status lookup)
+        # 3. Unique transaction reference
         reference = str(uuid.uuid4())
 
         headers = {
@@ -78,7 +78,7 @@ class PayClass:
         body = {
             "amount": str(amount),
             "currency": currency,
-            "externalId": reference,   # use ref for reconciliation
+            "externalId": "123456",
             "payer": {
                 "partyIdType": "MSISDN",
                 "partyId": phone
@@ -91,49 +91,23 @@ class PayClass:
 
         try:
             response = requests.post(url, headers=headers, json=body)
+
             print("PAY RAW RESPONSE:", response.text)
 
-            # Always return the reference ID so front-end can track status
+            if response.status_code in [200, 202]:
+                return {
+                    "status": "success",
+                    "transaction_ref": reference,
+                    "detail": response.text
+                }
+
             return {
-                "status": "submitted",
-                "reference": reference,
-                "raw_response": response.text
+                "status": "failed",
+                "http_code": response.status_code,
+                "response": response.text
             }
 
         except Exception as e:
             print("❌ Exception in momopay():", e)
-            return {"status": "error", "reason": str(e), "reference": reference}
-
-    # ----------------------------------------------------------
-    # Check Payment Status
-    # ----------------------------------------------------------
-    @staticmethod
-    def check_status(reference_id):
-
-        token_data = PayClass.momotoken()
-        if token_data is None:
-            return "UNKNOWN"
-
-        access_token = token_data["access_token"]
-
-        url = f"{PayClass.BASE_URL}/collection/v1_0/requesttopay/{reference_id}"
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "X-Target-Environment": "mtnbenin",
-            "Ocp-Apim-Subscription-Key": PayClass.subscriptionKey
-        }
-
-        try:
-            response = requests.get(url, headers=headers)
-            data = response.json()
-            print("STATUS RESPONSE:", data)
-
-            # Possible statuses:
-            # PENDING | SUCCESSFUL | FAILED
-            return data.get("status", "UNKNOWN")
-
-        except Exception as e:
-            print("❌ Exception in check_status():", e)
-            return "UNKNOWN"
+            return {"status": "error", "reason": str(e)}
 
